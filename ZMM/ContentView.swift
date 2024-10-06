@@ -2,82 +2,16 @@ import SwiftUI
 import AVFoundation
 
 struct
-VoicePickerV: View {
-	@EnvironmentObject	var
-	environ	: Environ
-
-	@Binding			var
-	name	: String
-
-	@Binding			var
-	style	: String
-
-	func
-	Styles( _ name: String ) -> [ String ] {
-		guard let speaker = environ.speakers.filter( { $0.name == name } ).first else { return [] }
-		return speaker.styles.map( { $0.style } )
-	}
-
-	var
-	body: some View {
-		Menu( name + " " + style ) {
-			ForEach( environ.speakers.map( { $0.name } ), id: \.self ) { name in
-				let styles = Styles( name )
-				if styles.count > 1 {
-					Menu( name ) {
-						ForEach( styles, id: \.self ) { style in
-							Button( style ) {
-								self.name = name
-								self.style = style
-							}
-						}
-					}
-				} else {
-					Button( name ) {
-						self.name = name
-						self.style = styles[ 0 ]
-					}
-				}
-			}
-		}.frame( width: 200 )
-	}
-}
-
-struct
-DoubleParamV: View {
-	
-	@Binding	var
-	value	: Double
-
-	let
-	title	: String
-	let
-	low		: Double
-	let
-	high	: Double
-
-	var
-	body: some View {
-		HStack {
-			Text( title )
-			Text( String( format: "%.2f", value ) ).monospacedDigit()
-			Slider( value: $value , in: low...high )
-			Divider()
-		}
-	}
-}
-
-struct
 ShowOptions {
-	var showSpeedScale			= false
-	var showPitchScale			= false
-	var showIntonationScale		= false
-	var showVolumeScale			= false
-	var showPrePhonemeLength	= false
-	var showPostPhonemeLength	= false
+	var speedScale			= false
+	var pitchScale			= false
+	var intonationScale		= false
+	var volumeScale			= false
+	var prePhonemeLength	= false
+	var postPhonemeLength	= false
 	
 	var hasTrue: Bool {
-		get { showSpeedScale || showPitchScale || showIntonationScale || showVolumeScale || showPrePhonemeLength || showPostPhonemeLength }
+		get { speedScale || pitchScale || intonationScale || volumeScale || prePhonemeLength || postPhonemeLength }
 	}
 }
 
@@ -105,16 +39,17 @@ LineV: View {
 			HStack {
 				VoicePickerV( name: $script[ index ].name, style: $script[ index ].style )
 				JPTextField( text: $script[ index ].dialog )
+//				TextField( "", text: $script[ index ].dialog )
 			}
 			if showOptions.hasTrue {
 				HStack {
 					Divider()
-					if showOptions.showSpeedScale			{ DoubleParamV( value: $script[ index ].parameters.speedScale			, title: "話速"		, low: +0.50, high: 2.00 ) }
-					if showOptions.showPitchScale			{ DoubleParamV( value: $script[ index ].parameters.pitchScale			, title: "音高"		, low: -0.15, high: 0.15 ) }
-					if showOptions.showIntonationScale		{ DoubleParamV( value: $script[ index ].parameters.intonationScale		, title: "抑揚"		, low: +0.00, high: 2.00 ) }
-					if showOptions.showVolumeScale			{ DoubleParamV( value: $script[ index ].parameters.volumeScale			, title: "音量"		, low: +0.00, high: 2.00 ) }
-					if showOptions.showPrePhonemeLength		{ DoubleParamV( value: $script[ index ].parameters.prePhonemeLength		, title: "開始無音"	, low: +0.00, high: 1.50 ) }
-					if showOptions.showPostPhonemeLength	{ DoubleParamV( value: $script[ index ].parameters.postPhonemeLength	, title: "修了無音"	, low: +0.00, high: 1.50 ) }
+					if showOptions.speedScale			{ DoubleParamV( value: $script[ index ].parameters.speedScale			, title: "話速"		, low: +0.50, high: 2.00 ) }
+					if showOptions.pitchScale			{ DoubleParamV( value: $script[ index ].parameters.pitchScale			, title: "音高"		, low: -0.15, high: 0.15 ) }
+					if showOptions.intonationScale		{ DoubleParamV( value: $script[ index ].parameters.intonationScale		, title: "抑揚"		, low: +0.00, high: 2.00 ) }
+					if showOptions.volumeScale			{ DoubleParamV( value: $script[ index ].parameters.volumeScale			, title: "音量"		, low: +0.00, high: 2.00 ) }
+					if showOptions.prePhonemeLength		{ DoubleParamV( value: $script[ index ].parameters.prePhonemeLength		, title: "開始無音"	, low: +0.00, high: 1.50 ) }
+					if showOptions.postPhonemeLength	{ DoubleParamV( value: $script[ index ].parameters.postPhonemeLength	, title: "修了無音"	, low: +0.00, high: 1.50 ) }
 				}
 			}
 		}.contextMenu {
@@ -143,7 +78,6 @@ LineV: View {
 				} else {
 					showSheet = true
 				}
-			}.sheet( isPresented: $showSheet ) {
 			}
 		}.sheet( isPresented: $showSheet ) {
 			OldAccentEditorV( line: $script[ index ] )
@@ -167,9 +101,6 @@ ScriptV: View {
 
 	@State private			var
 	progress				: Float?
-
-	@State private			var
-	audioPlayer				: AVAudioPlayer?
 
 	func
 	SetProgress( _ progress: Float? ) async {
@@ -271,12 +202,12 @@ ScriptV: View {
 				}.disabled( progress != nil )
 				if let progress = self.progress { ProgressView( "", value: progress ).frame( width: 160, height: 0 ) }
 				Spacer()
-				Toggle( isOn: $showOptions.showSpeedScale			) { Text( "話速"		) }
-				Toggle( isOn: $showOptions.showPitchScale			) { Text( "音高"		) }
-				Toggle( isOn: $showOptions.showIntonationScale		) { Text( "抑揚"		) }
-				Toggle( isOn: $showOptions.showVolumeScale			) { Text( "音量"		) }
-				Toggle( isOn: $showOptions.showPrePhonemeLength		) { Text( "開始無音"	) }
-				Toggle( isOn: $showOptions.showPostPhonemeLength	) { Text( "修了無音"	) }
+				Toggle( isOn: $showOptions.speedScale			) { Text( "話速"		) }
+				Toggle( isOn: $showOptions.pitchScale			) { Text( "音高"		) }
+				Toggle( isOn: $showOptions.intonationScale		) { Text( "抑揚"		) }
+				Toggle( isOn: $showOptions.volumeScale			) { Text( "音量"		) }
+				Toggle( isOn: $showOptions.prePhonemeLength		) { Text( "開始無音"	) }
+				Toggle( isOn: $showOptions.postPhonemeLength	) { Text( "修了無音"	) }
 			}
 			Divider()
 			List( selection: $selectionValues ) {
@@ -332,6 +263,7 @@ ContentView: View {
 
 	@Binding var
 	document: ZMMDocument
+
 	var
 	body: some View {
 		if environ.speakers.count > 0 {
