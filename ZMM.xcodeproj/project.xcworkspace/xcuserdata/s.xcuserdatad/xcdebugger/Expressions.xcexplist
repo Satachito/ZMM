@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VariablesViewState
+   version = "1.0">
+   <ContextStates>
+      <ContextState
+         contextName = "closure #3 in LineV.body.getter:ContentView.swift">
+         <PersistentStrings>
+            <PersistentString
+               value = "window.frame">
+            </PersistentString>
+            <PersistentString
+               value = "window.contentSize">
+            </PersistentString>
+         </PersistentStrings>
+      </ContextState>
+      <ContextState
+         contextName = "closure #1 in ZMMVerticalSlider.body.getter:ZMMEditor.swift">
+         <PersistentStrings>
+            <PersistentString
+               value = "geometry.size.width">
+            </PersistentString>
+         </PersistentStrings>
+      </ContextState>
+   </ContextStates>
+</VariablesViewState>
