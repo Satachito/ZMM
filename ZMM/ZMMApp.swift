@@ -10,8 +10,8 @@ Speaker {
 }
 struct
 ZMMError: LocalizedError {
-    let	errorDescription	: String?
-    init( _ errorDescription: String ) {
+	let	errorDescription	: String?
+	init( _ errorDescription: String ) {
 		self.errorDescription = errorDescription
 	}
 }
@@ -31,9 +31,12 @@ Environ: ObservableObject {
 }
 func
 FetchSpeakers() async throws -> [ Speaker ] {
+
+	@AppStorage( "engineURL" ) var engineURL: String = "http://localhost:50021"
+
 	let
 	json = try JSONSerialization.jsonObject(
-		with	: try await SharedData( URLRequest( "http://127.0.0.1:50021/speakers" ) )
+		with	: try await SharedData( URLRequest( "\(engineURL)/speakers" ) )
 	,	options	: []
 	) as! [ [ String: Any ] ]
 
@@ -59,10 +62,12 @@ ZMMApp: App {
 	private			let	environ			= Environ()
 	@State private	var	showingAlert	= false
 	@State private	var	errorString		= ""
+	@State private	var	showSettings	= false
 	
 	var
 	body: some Scene {
 		DocumentGroup( newDocument: ZMMDocument() ) {
+			
 			ContentView( document: $0.$document ).environmentObject( environ ).onAppear {
 				Task {
 					do {
@@ -74,8 +79,44 @@ ZMMApp: App {
 						}
 					}
 				}
-			}.alert( isPresented: $showingAlert ) {
+			}.padding().alert( isPresented: $showingAlert ) {
 				Alert( title: Text( "VOICEVOXにアクセスできません" ), message: Text( errorString ) )
+			}.toolbar {
+				ToolbarItem() {
+					Menu {
+						Button( "設定" ) {
+							showSettings = true
+						}
+//						Button( "ヘルプ" ) {
+//							// ヘルプ画面への遷移処理
+//						}
+					} label: {
+						Image( systemName: "ellipsis" )
+					}
+				}
+			}.sheet( isPresented: $showSettings ) {
+				SettingsView().padding()
+			}
+		}
+	}
+}
+
+struct
+SettingsView: View {
+
+	@Environment(\.dismiss) var	dismiss
+	@AppStorage( "engineURL" ) var engineURL: String = "http://localhost:50021"
+
+	var body: some View {
+		 Form {
+			Section( header: Text( "APIs" ) ) {
+				TextField( "VOICEVOX ENGINE", text: $engineURL )
+//				Button( "CLEAR DEFAULT" ) {
+//					UserDefaults.standard.removeObject( forKey: "engineURL" )
+//				}
+			}
+			HStack {
+				Button( "閉じる" ) { dismiss() }
 			}
 		}
 	}

@@ -68,9 +68,14 @@ LineView: View {
 			Button( "削除" ) { script.remove( at: index ) }
 			Button( "編集" ) { showingEditor = true }
 		}.sheet( isPresented: $showingEditor ) {
+#if os( iOS )
+			EditorView( line: $script[ index ] ).frame( maxWidth: .infinity ).padding()
+#endif
+#if os( macOS )
 			if let window = NSApplication.shared.windows.first {
 				EditorView( line: $script[ index ] ).frame( width: window.frame.size.width ).padding()
 			}
+#endif
 		}
 	}
 }
@@ -91,6 +96,8 @@ ScriptView: View {
 	@State	private		var	txtErrorString	= ""
 	@State	private		var	addAlert		= false
 	@State	private		var	addErrorString	= ""
+
+	@State	private		var	showOpen		= false
 
 	func
 	WAV() async throws -> Data? {
@@ -139,6 +146,7 @@ ScriptView: View {
 		VStack {
 			HStack {
 				Button( ".wav 作成" ) {
+#if os( macOS )
 					let savePanel = NSSavePanel()
 					savePanel.nameFieldStringValue = "Untitled.wav"
 					savePanel.canCreateDirectories = true
@@ -158,6 +166,7 @@ ScriptView: View {
 							}
 						}
 					}
+#endif
 				}.disabled( progress != nil ).alert( isPresented: $wavAlert ) {
 					Alert( title: Text( ".wavの作成に失敗しました。" ), message: Text( "wavErrorString" ) )
 				}
@@ -196,29 +205,47 @@ ScriptView: View {
 						}
 					}
 				}
-				Button( ".txt 読込" ) {
+				Button( "テキスト読込" ) {
+#if os( iOS )
+					showOpen = true
+#endif
+#if os( macOS )
 					let panel = NSOpenPanel()
 					panel.allowsMultipleSelection = false
 					panel.canChooseDirectories = false
 
 					if panel.runModal() == .OK, let url = panel.url {
-						Task {
-							do {
-								for line in try String( contentsOfFile: url.path, encoding: .utf8 ).components( separatedBy: "\n" ) {
-									let
-									components = line.components( separatedBy: "：" )
-									if components.count == 2 { try await AddLine( components[ 0 ], "ノーマル", components[ 1 ] ) }
-								}
-							} catch {
-								await MainActor.run {
-									txtErrorString = error.localizedDescription
-									txtAlert = true
-								}
-							}
-						}
+						OpenTask( url )
 					}
+#endif
 				}.alert( isPresented: $txtAlert ) {
 					Alert( title: Text( ".txtの読み込みに失敗しました。" ), message: Text( "" ) )
+				}
+#if os( iOS )
+				.sheet( isPresented: $showOpen ) {
+					DocumentPicker( exportMode: false, types: [ .content ] ) { urls in
+						if let url = urls.first {
+							OpenTask( url )
+  						}
+					}
+				}
+#endif
+			}
+		}
+	}
+	func
+	OpenTask( _ url: URL ) {
+		Task {
+			do {
+				for line in try String( contentsOfFile: url.path, encoding: .utf8 ).components( separatedBy: "\n" ) {
+					let
+					components = line.components( separatedBy: "：" )
+					if components.count == 2 { try await AddLine( components[ 0 ], "ノーマル", components[ 1 ] ) }
+				}
+			} catch {
+				await MainActor.run {
+					txtErrorString = error.localizedDescription
+					txtAlert = true
 				}
 			}
 		}
@@ -236,9 +263,9 @@ ContentView: View {
 	var
 	body: some View {
 		if environ.speakers.count > 0 {
-			ScriptView( script: $document.script ).padding()
+			ScriptView( script: $document.script )
 		} else {
-			Text( "loading" ).padding()
+			Text( "loading" )
 		}
 	}
 }
@@ -246,3 +273,4 @@ ContentView: View {
 #Preview {
 	ContentView( document: .constant( ZMMDocument() ) )
 }
+

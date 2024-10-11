@@ -18,7 +18,7 @@ SystemImageButton: View {
 	}
 }
 
-//	vv	TODO: IF MAC
+#if os( macOS )
 //	There's a bug where just focusing on a TextField registers it with the UndoManager, so we wrap the native XXTextField
 import AppKit
 
@@ -112,3 +112,72 @@ JPTextEditor: NSViewRepresentable {
 	}
 }
 //	^^	TODO
+#endif
+
+#if os( iOS )
+import UniformTypeIdentifiers
+
+struct
+DocumentPicker: UIViewControllerRepresentable {
+
+	@State	private	var
+	exportMode		= false
+	
+	@State	private	var
+	types			: [ UTType ]
+	
+	let
+	action			: ( [ URL ] ) -> ()
+
+	init(
+			exportMode	: Bool
+	,		types		: [ UTType ]
+	,	_	action		: @escaping ( [ URL ] ) -> ()
+	) {
+		self.exportMode	= exportMode
+		self.types		= types
+		self.action		= action
+	}
+	
+	class
+	Coordinator	: NSObject, UIDocumentPickerDelegate {
+		var
+		parent: DocumentPicker
+
+		init( parent: DocumentPicker ) {
+			self.parent = parent
+		}
+
+		func
+		documentPicker( _ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [ URL ] ) {
+			parent.action( urls )
+		}
+
+		func
+		documentPickerWasCancelled( _ controller: UIDocumentPickerViewController ) {
+			// Cancelled
+		}
+	}
+
+	func
+	makeCoordinator() -> Coordinator {
+		Coordinator( parent: self )
+	}
+
+	func
+	makeUIViewController( context: Context ) -> UIDocumentPickerViewController {
+		let
+		vc = exportMode
+		?	UIDocumentPickerViewController( forExporting			: []	, asCopy: true )
+ 		:	UIDocumentPickerViewController( forOpeningContentTypes	: types	, asCopy: true )
+		vc.delegate					= context.coordinator
+		vc.allowsMultipleSelection	= false
+		return vc
+	}
+
+	func
+	updateUIViewController( _ uiViewController: UIDocumentPickerViewController, context: Context ) {
+		// No update required
+	}
+}
+#endif
