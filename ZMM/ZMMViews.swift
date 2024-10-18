@@ -2,100 +2,104 @@ import SwiftUI
 import AVFoundation
 
 struct
-ShowOptions {
-	var speedScale			= false
-	var pitchScale			= false
-	var intonationScale		= false
-	var volumeScale			= false
-	var prePhonemeLength	= false
-	var postPhonemeLength	= false
+VoiceOptions {
+	var	speedScale			= false
+	var	pitchScale			= false
+	var	intonationScale		= false
+	var	volumeScale			= false
+	var	prePhonemeLength	= false
+	var	postPhonemeLength	= false
 	
-	var hasTrue				: Bool {
+	var	hasTrue				: Bool {
 		get { speedScale || pitchScale || intonationScale || volumeScale || prePhonemeLength || postPhonemeLength }
 	}
 }
 
 struct
 LineView: View {
-	
-	@EnvironmentObject	var	environ			: Environ
+	@EnvironmentObject	var	voices			: Voices
+
+	@State	private		var	error			= ZMMError() as Error
+	@State	private		var	alert			= false
 
 	@State	private		var	showingEditor	= false
-	@State	private		var	playAlert		= false
-	@State	private		var	playErrorString	= ""
 
-	@State	private		var	audioPlayer		: AVAudioPlayer?
-
-	@Binding			var	script			: [ ScriptLine ]
-						let	index			: Int
-						let	showOptions		: ShowOptions
+	@Binding			var	line			: ScriptLine
+						let	voiceOptions	: VoiceOptions
+						let	remove			: () -> ()
 
 	var
 	body: some View {
 		VStack {
 			HStack {
-				VoicePicker( speaker: $script[ index ].name, style: $script[ index ].style )
-				Text( script[ index ].dialog )
-				Spacer()
-			}
-			if showOptions.hasTrue {
-				HStack {
-					Divider()
-					if showOptions.speedScale			{ DoubleParamView( value: $script[ index ].parameters.speedScale		, title: "話速"		, low: +0.50, high: 2.00 ) }
-					if showOptions.pitchScale			{ DoubleParamView( value: $script[ index ].parameters.pitchScale		, title: "音高"		, low: -0.15, high: 0.15 ) }
-					if showOptions.intonationScale		{ DoubleParamView( value: $script[ index ].parameters.intonationScale	, title: "抑揚"		, low: +0.00, high: 2.00 ) }
-					if showOptions.volumeScale			{ DoubleParamView( value: $script[ index ].parameters.volumeScale		, title: "音量"		, low: +0.00, high: 2.00 ) }
-					if showOptions.prePhonemeLength		{ DoubleParamView( value: $script[ index ].parameters.prePhonemeLength	, title: "開始無音"	, low: +0.00, high: 1.50 ) }
-					if showOptions.postPhonemeLength	{ DoubleParamView( value: $script[ index ].parameters.postPhonemeLength	, title: "修了無音"	, low: +0.00, high: 1.50 ) }
-				}
-			}
-		}.contextMenu {
-			Button( "再生" ) {
-				Task {
-					do {
-						audioPlayer = try AVAudioPlayer( data: try await script[ index ].WAV( environ ) )
-						audioPlayer?.play()
-					} catch {
-						await MainActor.run {
-							playErrorString = error.localizedDescription
-							playAlert = true
+				VoicePicker(
+					speaker	: $line.speaker
+				,	style	: $line.style
+				).onChange( of: line.speaker ) {
+					Task {
+						do {
+							( line.parametersVV, line.parametersCI ) = try await line.Parameters( voices )
+						} catch {
+							await MainActor.run { ( self.error, alert ) = ( error, true ) }
 						}
 					}
 				}
-			}.alert( isPresented: $playAlert ) {
-				Alert( title: Text( "再生に失敗しました" ), message: Text( playErrorString ) )
+				Divider()
+				Text( line.dialog )
+				Spacer()
+				Divider()
+				SystemImageButton( "pencil" ) { showingEditor = true }
+				Divider()
+				AudioControllerView {
+					do {
+						return try await line.WAV( voices )
+					} catch {
+						( self.error, alert ) = ( error, true )
+						return Data()
+					}
+				}//.padding( 4 ).border( .black.opacity( 0.3 ), width: 1 )
 			}
-			Button( "削除" ) { script.remove( at: index ) }
+			if voiceOptions.hasTrue {
+				HStack {
+					Divider()
+					if voiceOptions.speedScale			{ DoubleParamView( value: $line.speedScale			, title: "話速"		, low: +0.50, high: 2.00 ) }
+					if voiceOptions.pitchScale			{ DoubleParamView( value: $line.pitchScale			, title: "音高"		, low: -0.15, high: 0.15 ) }
+					if voiceOptions.intonationScale		{ DoubleParamView( value: $line.intonationScale		, title: "抑揚"		, low: +0.00, high: 2.00 ) }
+					if voiceOptions.volumeScale			{ DoubleParamView( value: $line.volumeScale			, title: "音量"		, low: +0.00, high: 2.00 ) }
+					if voiceOptions.prePhonemeLength	{ DoubleParamView( value: $line.prePhonemeLength	, title: "開始無音"	, low: +0.00, high: 1.50 ) }
+					if voiceOptions.postPhonemeLength	{ DoubleParamView( value: $line.postPhonemeLength	, title: "修了無音"	, low: +0.00, high: 1.50 ) }
+				}
+			}
+		}.contextMenu {
+			Button( "削除" ) { remove() }
 			Button( "編集" ) { showingEditor = true }
 		}.sheet( isPresented: $showingEditor ) {
 #if os( iOS )
-			EditorView( line: $script[ index ] ).frame( maxWidth: .infinity ).padding()
+			EditorView( line: $line ).frame( maxWidth: .infinity ).padding()
 #endif
 #if os( macOS )
 			if let window = NSApplication.shared.windows.first {
-				EditorView( line: $script[ index ] ).frame( width: window.frame.size.width ).padding()
+				EditorView( line: $line ).frame( width: window.frame.size.width ).padding()
 			}
 #endif
+		}.alert( isPresented: $alert ) {
+			ZMMAlert( "再生に失敗しました", error )
 		}
 	}
 }
 
 struct
 ScriptView: View {
-	@EnvironmentObject	var	environ			: Environ
+	@EnvironmentObject	var	voices			: Voices
+
+	@State	private		var	error			= ZMMError() as Error
+	@State	private		var	alert			= false
 
 	@Binding			var	script			: [ ScriptLine ]
 	
-	@State	private		var	showOptions		= ShowOptions()
+	@State	private		var	voiceOptions	= VoiceOptions()
 
 	@State	private		var	progress		: Float?
-
-	@State	private		var	wavAlert		= false
-	@State	private		var	wavErrorString	= ""
-	@State	private		var	txtAlert		= false
-	@State	private		var	txtErrorString	= ""
-	@State	private		var	addAlert		= false
-	@State	private		var	addErrorString	= ""
 
 	@State	private		var	showOpen		= false
 
@@ -109,9 +113,7 @@ ScriptView: View {
 		wavs	: [ Data ] = []
 		for i in 0 ..< script.count {
 			await SetProgress( Float( i ) / Float( script.count ) )
-			let
-			line = script[ i ]
-			wavs.append( try await line.WAV( environ ) )
+			wavs.append( try await script[ i ].WAV( voices ) )
 		}
 		await SetProgress( 1 )
 
@@ -134,10 +136,10 @@ ScriptView: View {
 	}
 
 	func
-	AddLine( _ name: String = "ずんだもん", _ style: String = "ノーマル", _ dialog: String = "" ) async throws {
+	AddLine( _ speaker: String = "ずんだもん", _ style: String = "ノーマル", _ dialog: String = "" ) async throws {
 		var
-		line = ScriptLine( name: name, style: style, dialog: dialog )
-		line.parameters = try await line.FetchParameters( environ )
+		line = try await ScriptLine( speaker, style, dialog, voices )
+		( line.parametersVV, line.parametersCI ) = try await line.Parameters( voices )
 		script.append( line )
 	}
 
@@ -158,35 +160,32 @@ ScriptView: View {
 									guard let wav = try await WAV() else { return }
 									try wav.write( to: url )
 								} catch {
-									await MainActor.run {
-										wavErrorString = error.localizedDescription
-										wavAlert = true
-									}
+									await MainActor.run { ( self.error, alert ) = ( error, true ) }
 								}
 							}
 						}
 					}
 #endif
-				}.disabled( progress != nil ).alert( isPresented: $wavAlert ) {
-					Alert( title: Text( ".wavの作成に失敗しました。" ), message: Text( "wavErrorString" ) )
+				}.disabled( progress != nil ).alert( isPresented: $alert ) {
+					ZMMAlert( ".wavの作成に失敗しました。", error )
 				}
 				if let progress = self.progress { ProgressView( "", value: progress ).frame( width: 160, height: 0 ) }
 				Spacer()
-				Toggle( isOn: $showOptions.speedScale			) { Text( "話速"		) }
-				Toggle( isOn: $showOptions.pitchScale			) { Text( "音高"		) }
-				Toggle( isOn: $showOptions.intonationScale		) { Text( "抑揚"		) }
-				Toggle( isOn: $showOptions.volumeScale			) { Text( "音量"		) }
-				Toggle( isOn: $showOptions.prePhonemeLength		) { Text( "開始無音"	) }
-				Toggle( isOn: $showOptions.postPhonemeLength	) { Text( "修了無音"	) }
+				Toggle( isOn: $voiceOptions.speedScale			) { Text( "話速"		) }
+				Toggle( isOn: $voiceOptions.pitchScale			) { Text( "音高"		) }
+				Toggle( isOn: $voiceOptions.intonationScale		) { Text( "抑揚"		) }
+				Toggle( isOn: $voiceOptions.volumeScale			) { Text( "音量"		) }
+				Toggle( isOn: $voiceOptions.prePhonemeLength	) { Text( "開始無音"	) }
+				Toggle( isOn: $voiceOptions.postPhonemeLength	) { Text( "修了無音"	) }
 			}
 			Divider()
 			List {
 				ForEach( script.indices, id: \.self ) { index in
-					LineView( script: $script, index: index, showOptions: showOptions )
+					LineView( line: $script[ index ], voiceOptions: voiceOptions, remove: { script.remove( at: index ) } )
 				}.onMove {
 					script.move( fromOffsets: $0, toOffset: $1 )
-//				}.onDelete {	//	UX が悪いので、contextMenu でやる
-//					script.remove( atOffsets: $0 )
+				}.onDelete {
+					script.remove( atOffsets: $0 )
 				}
 			}
 			Divider()
@@ -195,15 +194,14 @@ ScriptView: View {
 					Task {
 						do {
 							script.count > 0
-							?	try await AddLine( script.last!.name, script.last!.style )
+							?	try await AddLine( script.last!.speaker, script.last!.style )
 							:	try await AddLine()
 						} catch {
-							await MainActor.run {
-								addErrorString = error.localizedDescription
-								addAlert = true
-							}
+							await MainActor.run { ( self.error, alert ) = ( error, true ) }
 						}
 					}
+				}.alert( isPresented: $alert ) {
+					ZMMAlert( "スクリプトの追加に失敗しました。", error )
 				}
 				Button( "テキスト読込" ) {
 #if os( iOS )
@@ -218,8 +216,8 @@ ScriptView: View {
 						OpenTask( url )
 					}
 #endif
-				}.alert( isPresented: $txtAlert ) {
-					Alert( title: Text( ".txtの読み込みに失敗しました。" ), message: Text( "" ) )
+				}.alert( isPresented: $alert ) {
+					ZMMAlert( ".txtの読み込みに失敗しました。", error )
 				}
 #if os( iOS )
 				.sheet( isPresented: $showOpen ) {
@@ -240,13 +238,11 @@ ScriptView: View {
 				for line in try String( contentsOfFile: url.path, encoding: .utf8 ).components( separatedBy: "\n" ) {
 					let
 					components = line.components( separatedBy: "：" )
+					//	TODO: GET DEFAULT STYLE
 					if components.count == 2 { try await AddLine( components[ 0 ], "ノーマル", components[ 1 ] ) }
 				}
 			} catch {
-				await MainActor.run {
-					txtErrorString = error.localizedDescription
-					txtAlert = true
-				}
+				await MainActor.run { ( self.error, alert ) = ( error, true ) }
 			}
 		}
 	}
@@ -254,19 +250,12 @@ ScriptView: View {
 
 struct
 ContentView: View {
-	@EnvironmentObject var
-	environ	: Environ
-
 	@Binding var
 	document: ZMMDocument
 
 	var
 	body: some View {
-		if environ.speakers.count > 0 {
-			ScriptView( script: $document.script )
-		} else {
-			Text( "loading" )
-		}
+		ScriptView( script: $document.script )
 	}
 }
 

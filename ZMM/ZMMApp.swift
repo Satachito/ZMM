@@ -1,101 +1,126 @@
 struct
-Style {
+VVStyle {
 	let	name	: String
 	let	id		: UInt
 }
 struct
-Speaker {
+VVSpeaker {
 	let	name	: String
-	let	styles	: [ Style ]
+	let	styles	: [ VVStyle ]
 }
 struct
-ZMMError: LocalizedError {
-	let	errorDescription	: String?
-	init( _ errorDescription: String ) {
-		self.errorDescription = errorDescription
-	}
+CIStyle {
+	let	name	: String
+	let	id		: Int
+}
+struct
+CISpeaker {
+	let	name	: String
+	let	id		: String
+	let	styles	: [ CIStyle ]
 }
 
 class
-Environ: ObservableObject {
+Voices: ObservableObject {
 
-	@Published	var
-	speakers	: [ Speaker ] = []
-	
+	@AppStorage( "voicevoxURL"	)	var	voicevoxURL		: String = "http://localhost:50021"
+	@AppStorage( "coeiroinkURL"	)	var	coeiroinkURL	: String = "http://localhost:50032"
+
+	@Published						var	speakersVV		: [ VVSpeaker ]?
+	@Published						var	speakersCI		: [ CISpeaker ]?
+
 	func
-	SpeakerID( _ speaker: String, _ style: String ) throws -> UInt {
-		guard let speaker	= speakers.first		( where: { $0.name == speaker	} ) else { throw ZMMError( "Unknown Speaker: \(speaker)"	) }
-		guard let style		= speaker.styles.first	( where: { $0.name == style		} ) else { throw ZMMError( "Unknown Style: \(style)"		) }
-		return style.id
-	}
-}
-func
-FetchSpeakers() async throws -> [ Speaker ] {
+	VVSpeakers() async -> [ VVSpeaker ] {
+		do {
+			let
+			json = try JSONSerialization.jsonObject(
+				with	: try await SharedData( URLRequest( "\(voicevoxURL)/speakers" ) )
+			,	options	: []
+			) as! [ [ String: Any ] ]
 
-	@AppStorage( "engineURL" ) var engineURL: String = "http://localhost:50021"
-
-	let
-	json = try JSONSerialization.jsonObject(
-		with	: try await SharedData( URLRequest( "\(engineURL)/speakers" ) )
-	,	options	: []
-	) as! [ [ String: Any ] ]
-
-	return try json.map { speaker in
-		guard let name		= speaker[ "name"	] as? String				else { throw ZMMError( "Speakers malformed, speaker name not exists"	) }
-		guard let styles	= speaker[ "styles"	] as? [ [ String: Any ] ]	else { throw ZMMError( "Speakers malformed, speaker styles not exists"	) }
-		return Speaker(
-			name	: name
-		,	styles	: try styles.map { style in
-				guard let name	= style[ "name"	] as? String	else { throw ZMMError( "Speakers malformed, style name not exists"	) }
-				guard let id	= style[ "id"	] as? UInt		else { throw ZMMError( "Speakers malformed, style id not exists"	) }
-				return Style( name: name, id: id )
+			return try json.map { speaker in
+				guard let name		= speaker[ "name"	] as? String						else { throw ZMMError( "Speakers malformed, speaker name not exists"	) }
+				guard let styles	= speaker[ "styles"	] as? [ [ String: Any ] ]			else { throw ZMMError( "Speakers malformed, speaker styles not exists"	) }
+				return VVSpeaker(
+					name	: name
+				,	styles	: try styles.map { style in
+						guard let name	= style[ "name"	] as? String						else { throw ZMMError( "Speakers malformed, style name not exists"		) }
+						guard let id	= style[ "id"	] as? UInt							else { throw ZMMError( "Speakers malformed, style id not exists"		) }
+						return VVStyle( name: name, id: id )
+					}
+				)
 			}
-		)
+		} catch {
+			return []
+		}
+	}
+	func
+	CISpeakers() async -> [ CISpeaker ] {
+		do {
+			let
+			json = try JSONSerialization.jsonObject(
+				with	: try await SharedData( URLRequest( "\(coeiroinkURL)/v1/speakers" ) )
+			,	options	: []
+			) as! [ [ String: Any ] ]
+
+			return try json.map { speaker in
+				guard let name		= speaker[ "speakerName"	] as? String				else { throw ZMMError( "Speakers malformed, speaker name not exists"	) }
+				guard let id		= speaker[ "speakerUuid"	] as? String				else { throw ZMMError( "Speakers malformed, speaker uuid not exists"	) }
+				guard let styles	= speaker[ "styles"			] as? [ [ String: Any ] ]	else { throw ZMMError( "Speakers malformed, speaker styles not exists"	) }
+				return CISpeaker(
+					name	: name
+				,	id		: id
+				,	styles	: try styles.map { style in
+						guard let name	= style[ "styleName"	] as? String				else { throw ZMMError( "Speakers malformed, style name not exists"		) }
+						guard let id	= style[ "styleId"		] as? Int					else { throw ZMMError( "Speakers malformed, style id not exists"		) }
+						return CIStyle( name: name, id: id )
+					}
+				)
+			}
+		} catch {
+			return []
+		}
 	}
 }
+
 
 import SwiftUI
 
 @main struct
 ZMMApp: App {
-
-	private			let	environ			= Environ()
-	@State private	var	showingAlert	= false
-	@State private	var	errorString		= ""
-	@State private	var	showSettings	= false
+	@StateObject	private	var	voices			= Voices()
+	@State			private	var	showSettings	= false
 	
 	var
 	body: some Scene {
 		DocumentGroup( newDocument: ZMMDocument() ) {
-			
-			ContentView( document: $0.$document ).environmentObject( environ ).onAppear {
-				Task {
-					do {
-						environ.speakers = try await FetchSpeakers()
-					} catch {
-						await MainActor.run {
-							errorString = error.localizedDescription
-							showingAlert = true
-						}
+			if voices.speakersVV == nil {
+				Text( "loading VOICEVOX voices" ).onAppear {
+					Task {
+						let	speakersVV = await voices.VVSpeakers()
+						await MainActor.run { voices.speakersVV = speakersVV }
 					}
-				}
-			}.padding().alert( isPresented: $showingAlert ) {
-				Alert( title: Text( "VOICEVOXにアクセスできません" ), message: Text( errorString ) )
-			}.toolbar {
+				}.frame( height: 20 )
+			}
+			if voices.speakersCI == nil {
+				Text( "loading COEIROINK voices" ).onAppear {
+					Task {
+						let	speakersCI = await voices.CISpeakers()
+						await MainActor.run { voices.speakersCI = speakersCI }
+					}
+				}.frame( height: 20 )
+			}
+			ContentView( document: $0.$document ).padding().environmentObject( voices ).toolbar {
 				ToolbarItem() {
 					Menu {
-						Button( "設定" ) {
-							showSettings = true
-						}
-//						Button( "ヘルプ" ) {
-//							// ヘルプ画面への遷移処理
-//						}
+						Button( "設定"	) { showSettings = true }
+						Button( "ヘルプ"	) {}
 					} label: {
 						Image( systemName: "ellipsis" )
 					}
 				}
 			}.sheet( isPresented: $showSettings ) {
-				SettingsView().padding()
+				SettingsView( voices: voices ).padding()
 			}
 		}
 	}
@@ -104,13 +129,15 @@ ZMMApp: App {
 struct
 SettingsView: View {
 
-	@Environment(\.dismiss) var	dismiss
-	@AppStorage( "engineURL" ) var engineURL: String = "http://localhost:50021"
+							var	voices	: Voices
 
-	var body: some View {
+	@Environment(\.dismiss)	var	dismiss
+
+	var	body: some View {
 		 Form {
 			Section( header: Text( "APIs" ) ) {
-				TextField( "VOICEVOX ENGINE", text: $engineURL )
+				TextField( "VOICEVOX ENGINE"	, text: voices.$voicevoxURL	)
+				TextField( "COEIROINK ENGINE"	, text: voices.$coeiroinkURL	)
 //				Button( "CLEAR DEFAULT" ) {
 //					UserDefaults.standard.removeObject( forKey: "engineURL" )
 //				}

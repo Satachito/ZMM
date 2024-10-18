@@ -48,7 +48,7 @@ ZMMVerticalSlider: View {
 			let	span	= upper - lower
 			ZStack( alignment: .bottomLeading ) {
 				Rectangle().fill( SLIDER_BG ).frame( width: width, height: height )
-				Rectangle().fill( SLIDER_FG ).frame( width: width, height: abs( height * ( value - lower ) / span ) )	//	TODO: Static analyzer のメッセージを止めることができたら、abs をはずす
+				Rectangle().fill( SLIDER_FG ).frame( width: width, height: height * ( value - lower ) / span )
 			}.frame( height: height ).gesture(
 				DragGesture().onChanged {
 					let
@@ -64,7 +64,7 @@ ZMMVerticalSlider: View {
 
 struct
 AccentPhraseEditorView: View {
-	@Binding	var	accent_phrase	: AccentPhrase
+	@Binding	var	accent_phrase	: VVAccentPhrase
 
 	var
 	body: some View {
@@ -89,133 +89,108 @@ AccentPhraseEditorView: View {
 			}
 		}
 	}
-    private var
-    numberFormatter: NumberFormatter {
-        let v = NumberFormatter()
-        v.numberStyle = .decimal
-        v.minimumFractionDigits = 2
-        v.maximumFractionDigits = 2
-        return v
-    }
-}
-
-import AVFAudio
-
-class
-Audio: NSObject, AVAudioPlayerDelegate, ObservableObject {
-
-	@Published	var	player		: AVAudioPlayer?
-	@Published	var isPlaying	= false
-
-	func
-	Load( data: Data ) throws {
-		player = try AVAudioPlayer( data: data )
-		player!.delegate = self
-	}
-	func
-	Play() {
-		player?.prepareToPlay()
-		player?.play()
-		isPlaying = true
-	}
-	func
-	Pause() {
-		player?.pause()
-		isPlaying = false
-	}
-	func
-	Stop() {
-		player = nil
-		isPlaying = false
-	}
-	func
-	audioPlayerDidFinishPlaying( _ _: AVAudioPlayer, successfully _: Bool ) {
-		DispatchQueue.main.async { self.Stop() }
+	private var
+	numberFormatter: NumberFormatter {
+		let v = NumberFormatter()
+		v.numberStyle = .decimal
+		v.minimumFractionDigits = 2
+		v.maximumFractionDigits = 2
+		return v
 	}
 }
 
 struct
-AudioControllerView: View {
+CIMorasEditorView: View {
+	@Binding	var	moras	: [ CIMora ]
 
-							var	fetch	: () async throws -> Data
-	@StateObject	private	var	audio	= Audio()
-//	@State			private	var	audio	= Audio()
-	
-	init( _ fetch: @escaping () async throws -> Data ) {
-		self.fetch = fetch
-        _audio = StateObject( wrappedValue: Audio() )
-	}
 	var
 	body: some View {
-		HStack {
-			if audio.player != nil {
-				if audio.isPlaying {
-					SystemImageButton( "pause" ) { audio.Pause() }
-				} else {
-					SystemImageButton( "play" ) { audio.Play() }
+		ForEach( moras.indices, id: \.self ) { index in
+			VStack {
+				Spacer()
+				
+				SystemImageButton( moras[ index ].accent > 0 ? "circle.fill" : "circle" ) {
+					moras[ index ].accent = moras[ index ].accent > 0 ? 0 : 1
 				}
-			} else {
-				SystemImageButton( "play" ) {
-					Task {
-						 try audio.Load( data: try await fetch() )
-						 audio.Play()
-					}
-				}
+				
+				Text( moras[ index ].hira )
 			}
-			SystemImageButton( "stop" ) { audio.Stop() }
 		}
 	}
 }
 
-
 struct
 EditorView: View {
 	@Environment(\.dismiss) var	dismiss
-	@EnvironmentObject		var	environ			: Environ
+	@EnvironmentObject		var	voices			: Voices
+
+	@State	private			var	error			= ZMMError() as Error
+	@State	private			var	alert			= false
+
 	@Binding				var	line			: ScriptLine
-	
-	@State					var	editingDialog	= ""
+
+	@State	private			var	editingText		= ""
 	
 	var
 	body: some View {
 		VStack {
-			TextEditor( text: $editingDialog ).onAppear {
-				editingDialog = line.dialog
+			TextEditor( text: $editingText ).onAppear {
+				editingText = line.dialog
 			}
 			Divider()
 			Button( "Commit" ) {
-				line.dialog = editingDialog
+				line.dialog = editingText
 				Task {
-					let
-					parameters = try await line.FetchParameters( environ )
-					await MainActor.run { line.parameters = parameters }
+					do {
+						( line.parametersVV, line.parametersCI ) = try await line.Parameters( voices )
+					} catch {
+						await MainActor.run { ( self.error, alert ) = ( error, true ) }
+					}
 				}
 			}
 			ScrollView( .horizontal ) {
 				HStack {
 					Divider()
-					ForEach( line.parameters.accent_phrases.indices, id: \.self ) { index in
-						AccentPhraseEditorView( accent_phrase: $line.parameters.accent_phrases[ index ] ).frame( width: 64 )
-						if let pause_mora = line.parameters.accent_phrases[ index ].pause_mora {
-							VStack{
-								Text( String( format: "%.2f", pause_mora.vowel_length ) ).monospacedDigit()
-								ZMMHorizontalSlider( value: $line.parameters.accent_phrases[ index ].pause_length, range: 0.0...3.0 ).frame( width: 64, height: 12 ).onAppear {
-									line.parameters.accent_phrases[ index ].pause_length = pause_mora.vowel_length
-								}
-								Spacer()
-								SystemImageButton( "circle.slash" ) {}.opacity( 0.5 )
-								Text( pause_mora.text )
-							}.frame( width: 64 )
+					if line.isVV( voices ) {
+						ForEach( line.parametersVV.accent_phrases.indices, id: \.self ) { index in
+							AccentPhraseEditorView( accent_phrase: $line.parametersVV.accent_phrases[ index ] ).frame( width: 64 )
+							if let pause_mora = line.parametersVV.accent_phrases[ index ].pause_mora {
+								VStack{
+									Text( String( format: "%.2f", pause_mora.vowel_length ) ).monospacedDigit()
+									ZMMHorizontalSlider( value: $line.parametersVV.accent_phrases[ index ].pause_length, range: 0.0...3.0 ).frame( width: 64, height: 12 ).onAppear {
+										line.parametersVV.accent_phrases[ index ].pause_length = pause_mora.vowel_length
+									}
+									Spacer()
+									SystemImageButton( "circle.slash" ) {}.opacity( 0.5 )
+									Text( pause_mora.text )
+								}.frame( width: 64 )
+							}
+							Divider()
 						}
-						Divider()
+					}
+					if line.isCI( voices ) {
+						ForEach( line.parametersCI.prosodyDetail.indices, id: \.self ) { index in
+							CIMorasEditorView( moras: $line.parametersCI.prosodyDetail[ index ] ).frame( width: 64 )
+							Divider()
+						}
 					}
 				}.padding()
 			}
 			HStack {
-				AudioControllerView { try await line.WAV( environ ) }
+				AudioControllerView {
+					do {
+						return try await line.WAV( voices )
+					} catch {
+						//	TODO: MainActorにする必要あるか調査
+						( self.error, alert ) = ( error, true )
+						return Data()
+					}
+				}
 				Spacer()
 				Button( "閉じる" ) { dismiss() }
 			}
+		}.alert( isPresented: $alert ) {
+			ZMMAlert( "再生に失敗しました", error )
 		}
 	}
 }
