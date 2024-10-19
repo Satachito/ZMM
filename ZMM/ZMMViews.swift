@@ -45,10 +45,8 @@ LineView: View {
 					}
 				}
 				Divider()
-				Text( line.dialog )
+				Button( line.dialog ) { showingEditor = true }
 				Spacer()
-				Divider()
-				SystemImageButton( "pencil" ) { showingEditor = true }
 				Divider()
 				AudioControllerView {
 					do {
@@ -57,7 +55,7 @@ LineView: View {
 						( self.error, alert ) = ( error, true )
 						return Data()
 					}
-				}//.padding( 4 ).border( .black.opacity( 0.3 ), width: 1 )
+				}
 			}
 			if voiceOptions.hasTrue {
 				HStack {
@@ -72,7 +70,6 @@ LineView: View {
 			}
 		}.contextMenu {
 			Button( "削除" ) { remove() }
-			Button( "編集" ) { showingEditor = true }
 		}.sheet( isPresented: $showingEditor ) {
 #if os( iOS )
 			EditorView( line: $line ).frame( maxWidth: .infinity ).padding()
@@ -250,8 +247,8 @@ ScriptView: View {
 
 struct
 ContentView: View {
-	@Binding var
-	document: ZMMDocument
+	@EnvironmentObject	var	voices		: Voices
+	@Binding			var	document	: ZMMDocument
 
 	var
 	body: some View {

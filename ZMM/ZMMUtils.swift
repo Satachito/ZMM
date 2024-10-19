@@ -39,7 +39,7 @@ VoicePicker: View {
 	
 	var
 	body: some View {
-		Menu( "\(speaker) \(style)" ) {
+		Menu( "\(speaker)：\(style)" ) {
 			if let speakersVV = voices.speakersVV {
 				Menu( "VOICEVOX" ) {
 					ForEach( speakersVV.map( { $0.name } ), id: \.self ) { speaker in

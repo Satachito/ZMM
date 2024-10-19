@@ -81,6 +81,32 @@ Voices: ObservableObject {
 			return []
 		}
 	}
+	var
+	statusVV	: String {
+		get {
+			var
+			status = "VOICEBOX:"
+			if let speakers = speakersVV {
+				status += "\( voicevoxURL ):\( speakers.count > 0 ? "\( speakers.count )" : "未接続" )"
+			} else {
+				status += "接続中"
+			}
+			return status
+		}
+	}
+	var
+	statusCI	: String {
+		get {
+			var
+			status = "COEIROINK:"
+			if let speakers = speakersCI {
+				status += "\( coeiroinkURL ):\( speakers.count > 0 ? "\( speakers.count )" : "未接続" )"
+			} else {
+				status += "接続中"
+			}
+			return status
+		}
+	}
 }
 
 
@@ -91,26 +117,46 @@ ZMMApp: App {
 	@StateObject	private	var	voices			= Voices()
 	@State			private	var	showSettings	= false
 	
+	func
+	VVTask() {
+		Task {
+			let	speakers = await voices.VVSpeakers()
+			await MainActor.run { voices.speakersVV = speakers }
+		}
+	}
+	func
+	CITask() {
+		Task {
+			let	speakers = await voices.CISpeakers()
+			await MainActor.run { voices.speakersCI = speakers }
+		}
+	}
 	var
 	body: some Scene {
 		DocumentGroup( newDocument: ZMMDocument() ) {
 			if voices.speakersVV == nil {
-				Text( "loading VOICEVOX voices" ).onAppear {
-					Task {
-						let	speakersVV = await voices.VVSpeakers()
-						await MainActor.run { voices.speakersVV = speakersVV }
-					}
-				}.frame( height: 20 )
+				Text( "loading VOICEVOX voices" ).onAppear { VVTask() }
 			}
 			if voices.speakersCI == nil {
-				Text( "loading COEIROINK voices" ).onAppear {
-					Task {
-						let	speakersCI = await voices.CISpeakers()
-						await MainActor.run { voices.speakersCI = speakersCI }
-					}
-				}.frame( height: 20 )
+				Text( "loading COEIROINK voices" ).onAppear { CITask() }
 			}
 			ContentView( document: $0.$document ).padding().environmentObject( voices ).toolbar {
+				if let speakers = voices.speakersVV, speakers.count == 0 {
+					ToolbarItem() { Button( "VOICEVOX に接続"		) { VVTask() } }
+				}
+				if let speakers = voices.speakersCI, speakers.count == 0 {
+					ToolbarItem() { Button( "COEIROINK に接続"	) { CITask() } }
+				}
+				ToolbarItem() {
+					SystemImageButton( "gear" ) { showSettings = true }
+				}
+			}.sheet( isPresented: $showSettings ) {
+				SettingsView( voices: voices ).padding()
+			}
+		}
+	}
+}
+/*
 				ToolbarItem() {
 					Menu {
 						Button( "設定"	) { showSettings = true }
@@ -119,13 +165,7 @@ ZMMApp: App {
 						Image( systemName: "ellipsis" )
 					}
 				}
-			}.sheet( isPresented: $showSettings ) {
-				SettingsView( voices: voices ).padding()
-			}
-		}
-	}
-}
-
+*/
 struct
 SettingsView: View {
 
@@ -133,17 +173,17 @@ SettingsView: View {
 
 	@Environment(\.dismiss)	var	dismiss
 
-	var	body: some View {
-		 Form {
-			Section( header: Text( "APIs" ) ) {
-				TextField( "VOICEVOX ENGINE"	, text: voices.$voicevoxURL	)
+	var
+	body: some View {
+		Form {
+			Section( header: Text( "エンドポイント" ) ) {
+				TextField( "VOICEVOX ENGINE"	, text: voices.$voicevoxURL		)
 				TextField( "COEIROINK ENGINE"	, text: voices.$coeiroinkURL	)
-//				Button( "CLEAR DEFAULT" ) {
-//					UserDefaults.standard.removeObject( forKey: "engineURL" )
-//				}
+//				Button( "CLEAR DEFAULT" ) { UserDefaults.standard.removeObject( forKey: "engineURL" ) }
 			}
 			HStack {
-				Button( "閉じる" ) { dismiss() }
+				Spacer()
+				Button( "閉じる" ) { dismiss() }.padding()
 			}
 		}
 	}
