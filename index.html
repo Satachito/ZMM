@@ -20,7 +20,7 @@ body {
 header, footer {
 ;	grid-column				: 1 / 4
 }
-header, nav, main, aside, footer {
+header, nav, main, aside {
 ;	padding					: 16px
 }
 .center {
@@ -40,7 +40,8 @@ header, nav, main, aside, footer {
 	</header>
 
 	<nav>
-		<img src=ZMM.png>
+		<img src=ZMM.png><br>
+		<img src=ZMM_SUB.png><br>
 	</nav>
 
 	<main>
@@ -48,24 +49,41 @@ header, nav, main, aside, footer {
 			<h2>特徴</h2>
 			<p>macOS ネイティブアプリです</p>
 			<p>VOICEVOX とCOEIROINK のエンジンを使ってシナリオを音声化できます</p>
+			<p>このアプリ自体の使用は商用・非商用問わず無料ですが、キャラクターの声の使用については、各キャラクターの利用規約をご参照ください。</p>
 		</section>
-
 		<section>
 			<h2>使い方</h2>
-			<p>下のボタンからZMMの最新バージョンをダウンロードしてください。</p>
-			<a class="button" href="https://github.com/Satachito/ZMM/releases/download/v0.1/ZMM.app.zip">Download ZMM</a>
-			<p>VOICEVOX と COEIROINK を起動してください。片方でも大丈夫です。</p>
+			<p>下のリンクから ZMM をダウンロードしてください。</p>
+			<a href="https://github.com/Satachito/ZMM/releases/download/v0.1/ZMM.app.zip">Download ZMM</a>
+			<p>VOICEVOX と COEIROINK の macOS 版を下のリンクからダウンロードして起動してください。片方でも大丈夫です。</p>
+			<a href="https://voicevox.hiroshiba.jp">VOICEBOX</a>
+			<a href="https://coeiroink.com">COEIROINK</a>
 			<p>シナリオを編集して .wav 作成ボタンで音声化できます！</p>
 			<p>[テキスト読込]ボタンは１行のうち：（コロン）の左にキャラクター、右にセリフのあるファイルを読み込んでシナリオにします。</p>
+			<p>サンプルファイルは下のリンクにあります。</p>
+			<a href="https://github.com/Satachito/ZMM/blob/main/sample.txt">Sample.txt</a>
 		</section>
-
-
-
+		<section>
+			<h2>お誘い</h2>
+			<p>ZMMはオープンソースです。最終的にはムービーメーカーを目指しています。</p>
+			<p>もしご興味あれば開発にご協力いただけませんか？</p>
+			<p>github のレポジトリは下のリンクにあります。</p>
+			<a href="https://github.com/Satachito/ZMM">github ZMM レポジトリ</a>
+			<p>ソースは All Swift で IDE は Xcode です。</p>
+			<p>例えば以下のようなことがあります。</p>
+			<ul>
+				<li>新規機能の開発</li>
+				<li>画面デザイン</li>
+				<li>進行管理とリリース</li>
+				<li>広報</li>
+				<li>etc...</li>
+			</ul>
+			<p>お待ちしています！</p>
+		</section>
 	</main>
 
 	<aside>
 	</aside>
-
 
 	<footer>
 		<p class=center>© 2024 Satachito - All Rights Reserved</p>
