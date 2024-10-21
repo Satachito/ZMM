@@ -23,8 +23,14 @@ CISpeaker {
 class
 Voices: ObservableObject {
 
-	@AppStorage( "voicevoxURL"	)	var	voicevoxURL		: String = "http://localhost:50021"
-	@AppStorage( "coeiroinkURL"	)	var	coeiroinkURL	: String = "http://localhost:50032"
+//#if os( macOS )
+//	@AppStorage( "voicevoxURL"	)	var	voicevoxURL		: String = "http://localhost:50021"
+//	@AppStorage( "coeiroinkURL"	)	var	coeiroinkURL	: String = "http://localhost:50032"
+//#endif
+//#if os( iOS )
+	@AppStorage( "voicevoxURL"	)	var	voicevoxURL		: String = "http://192.168.0.15:5021"
+	@AppStorage( "coeiroinkURL"	)	var	coeiroinkURL	: String = "http://192.168.0.15:5032"
+//#endif
 
 	@Published						var	speakersVV		: [ VVSpeaker ]?
 	@Published						var	speakersCI		: [ CISpeaker ]?
@@ -156,16 +162,7 @@ ZMMApp: App {
 		}
 	}
 }
-/*
-				ToolbarItem() {
-					Menu {
-						Button( "設定"	) { showSettings = true }
-						Button( "ヘルプ"	) {}
-					} label: {
-						Image( systemName: "ellipsis" )
-					}
-				}
-*/
+
 struct
 SettingsView: View {
 

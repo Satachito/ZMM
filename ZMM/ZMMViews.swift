@@ -26,7 +26,6 @@ LineView: View {
 
 	@Binding			var	line			: ScriptLine
 						let	voiceOptions	: VoiceOptions
-						let	remove			: () -> ()
 
 	var
 	body: some View {
@@ -45,7 +44,8 @@ LineView: View {
 					}
 				}
 				Divider()
-				Button( line.dialog ) { showingEditor = true }
+				Button( line.dialog ) { showingEditor = true }.buttonStyle( PlainButtonStyle() )
+			//	Text( line.dialog )
 				Spacer()
 				Divider()
 				AudioControllerView {
@@ -55,7 +55,7 @@ LineView: View {
 						( self.error, alert ) = ( error, true )
 						return Data()
 					}
-				}
+				}.buttonStyle( PlainButtonStyle() ).frame( width: 64 )
 			}
 			if voiceOptions.hasTrue {
 				HStack {
@@ -68,8 +68,6 @@ LineView: View {
 					if voiceOptions.postPhonemeLength	{ DoubleParamView( value: $line.postPhonemeLength	, title: "修了無音"	, low: +0.00, high: 1.50 ) }
 				}
 			}
-		}.contextMenu {
-			Button( "削除" ) { remove() }
 		}.sheet( isPresented: $showingEditor ) {
 #if os( iOS )
 			EditorView( line: $line ).frame( maxWidth: .infinity ).padding()
@@ -99,6 +97,8 @@ ScriptView: View {
 	@State	private		var	progress		: Float?
 
 	@State	private		var	showOpen		= false
+
+	@State	private		var	delimiter		= "："
 
 	func
 	WAV() async throws -> Data? {
@@ -168,17 +168,26 @@ ScriptView: View {
 				}
 				if let progress = self.progress { ProgressView( "", value: progress ).frame( width: 160, height: 0 ) }
 				Spacer()
+				Divider()
 				Toggle( isOn: $voiceOptions.speedScale			) { Text( "話速"		) }
+				Divider()
 				Toggle( isOn: $voiceOptions.pitchScale			) { Text( "音高"		) }
+				Divider()
 				Toggle( isOn: $voiceOptions.intonationScale		) { Text( "抑揚"		) }
+				Divider()
 				Toggle( isOn: $voiceOptions.volumeScale			) { Text( "音量"		) }
+				Divider()
 				Toggle( isOn: $voiceOptions.prePhonemeLength	) { Text( "開始無音"	) }
+				Divider()
 				Toggle( isOn: $voiceOptions.postPhonemeLength	) { Text( "修了無音"	) }
-			}
+				Divider()
+			}.frame( height: 20 )
 			Divider()
 			List {
 				ForEach( script.indices, id: \.self ) { index in
-					LineView( line: $script[ index ], voiceOptions: voiceOptions, remove: { script.remove( at: index ) } )
+					LineView( line: $script[ index ], voiceOptions: voiceOptions ).contextMenu {
+						Button( "削除" ) { script.remove( at: index ) }
+					}
 				}.onMove {
 					script.move( fromOffsets: $0, toOffset: $1 )
 				}.onDelete {
@@ -200,6 +209,9 @@ ScriptView: View {
 				}.alert( isPresented: $alert ) {
 					ZMMAlert( "スクリプトの追加に失敗しました。", error )
 				}
+				Divider()
+				Text( "区切り文字" )
+				TextField( "", text: $delimiter ).frame( width: 20 )
 				Button( "テキスト読込" ) {
 #if os( iOS )
 					showOpen = true
@@ -225,7 +237,7 @@ ScriptView: View {
 					}
 				}
 #endif
-			}
+			}.frame( height: 20 )
 		}
 	}
 	func
@@ -234,7 +246,7 @@ ScriptView: View {
 			do {
 				for line in try String( contentsOfFile: url.path, encoding: .utf8 ).components( separatedBy: "\n" ) {
 					let
-					components = line.components( separatedBy: "：" )
+					components = line.components( separatedBy: delimiter )
 					//	TODO: GET DEFAULT STYLE
 					if components.count == 2 { try await AddLine( components[ 0 ], "ノーマル", components[ 1 ] ) }
 				}

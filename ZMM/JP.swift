@@ -374,7 +374,6 @@ AudioControllerView: View {
 					}
 				}
 			}
-		//	if audio.isPlaying { SystemImageButton( "stop" ) { audio.Stop() } }
 			SystemImageButton( "stop" ) {
 				audio.Stop()
 			}.disabled( !audio.isPlaying )

@@ -122,14 +122,14 @@ CIMorasEditorView: View {
 struct
 EditorView: View {
 	@Environment(\.dismiss) var	dismiss
-	@EnvironmentObject		var	voices			: Voices
+	@EnvironmentObject		var	voices		: Voices
 
-	@State	private			var	error			= ZMMError() as Error
-	@State	private			var	alert			= false
+	@State	private			var	error		= ZMMError() as Error
+	@State	private			var	alert		= false
 
-	@Binding				var	line			: ScriptLine
+	@Binding				var	line		: ScriptLine
 
-	@State	private			var	editingText		= ""
+	@State	private			var	editingText	= ""
 	
 	var
 	body: some View {
