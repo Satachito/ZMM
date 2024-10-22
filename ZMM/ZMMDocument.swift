@@ -130,7 +130,7 @@ ScriptLine: Codable, Hashable {
 	
 	func
 	VVStyleID( _ voices: Voices ) throws -> UInt {
-		guard let speakers	= voices.speakersVV										else { throw ZMMError( "No VOICEVOX speakers"			) }
+		guard let speakers	= voices.speakersVV											else { throw ZMMError( "No VOICEVOX speakers"			) }
 		guard let speaker	= speakers.first		( where: { $0.name == speaker	} ) else { throw ZMMError( "Unknown Speaker: \(speaker)"	) }
 		guard let style		= speaker.styles.first	( where: { $0.name == style		} ) else { throw ZMMError( "Unknown Style: \(style)"		) }
 		return style.id
@@ -138,7 +138,7 @@ ScriptLine: Codable, Hashable {
 
 	func
 	CIVoiceID( _ voices: Voices ) throws -> ( String, Int ) {
-		guard let speakers	= voices.speakersCI										else { throw ZMMError( "No COEIROINK speakers"			) }
+		guard let speakers	= voices.speakersCI											else { throw ZMMError( "No COEIROINK speakers"			) }
 		guard let speaker	= speakers.first		( where: { $0.name == speaker	} ) else { throw ZMMError( "Unknown Speaker: \(speaker)"	) }
 		guard let style		= speaker.styles.first	( where: { $0.name == style		} ) else { throw ZMMError( "Unknown Style: \(style)"		) }
 		return ( speaker.id, style.id )
