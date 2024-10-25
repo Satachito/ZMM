@@ -101,20 +101,8 @@ ScriptLine: Codable, Hashable {
 	var	prePhonemeLength	: Double			= 0.1
 	var	postPhonemeLength	: Double			= 0.1
 
-	var	parametersVV		= VVParameters()
-	var	parametersCI		= CIParameters()
-
-	init(
-		_	speaker		: String
-	,	_	style		: String
-	,	_	dialog		: String
-	,	_	voices		: Voices
-	) async throws {
-		self.speaker	= speaker
-		self.style		= style
-		self.dialog		= dialog
-		( parametersVV, parametersCI ) = try await Parameters( voices )
-	}
+	var	parametersVV		: VVParameters?
+	var	parametersCI		: CIParameters?
 
 	func
 	isVV( _ voices: Voices ) -> Bool {
@@ -130,51 +118,48 @@ ScriptLine: Codable, Hashable {
 	
 	func
 	VVStyleID( _ voices: Voices ) throws -> UInt {
-		guard let speakers	= voices.speakersVV											else { throw ZMMError( "No VOICEVOX speakers"			) }
-		guard let speaker	= speakers.first		( where: { $0.name == speaker	} ) else { throw ZMMError( "Unknown Speaker: \(speaker)"	) }
-		guard let style		= speaker.styles.first	( where: { $0.name == style		} ) else { throw ZMMError( "Unknown Style: \(style)"		) }
+		guard let speakers	= voices.speakersVV											else { throw ZMMError( "No VOICEVOX speakers"				) }
+		guard let speaker	= speakers.first		( where: { $0.name == speaker	} ) else { throw ZMMError( "Unknown speaker: \(speaker)"		) }
+		guard let style		= speaker.styles.first	( where: { $0.name == style		} ) else { throw ZMMError( "Unknown voice: \(speaker):\(style)"	) }
 		return style.id
 	}
 
 	func
 	CIVoiceID( _ voices: Voices ) throws -> ( String, Int ) {
-		guard let speakers	= voices.speakersCI											else { throw ZMMError( "No COEIROINK speakers"			) }
-		guard let speaker	= speakers.first		( where: { $0.name == speaker	} ) else { throw ZMMError( "Unknown Speaker: \(speaker)"	) }
-		guard let style		= speaker.styles.first	( where: { $0.name == style		} ) else { throw ZMMError( "Unknown Style: \(style)"		) }
+		guard let speakers	= voices.speakersCI											else { throw ZMMError( "No COEIROINK speakers"				) }
+		guard let speaker	= speakers.first		( where: { $0.name == speaker	} ) else { throw ZMMError( "Unknown speaker: \(speaker)"		) }
+		guard let style		= speaker.styles.first	( where: { $0.name == style		} ) else { throw ZMMError( "Unknown voice: \(speaker):\(style)"	) }
 		return ( speaker.id, style.id )
 	}
 	
 	func
-	Parameters( _ voices: Voices ) async throws -> ( VVParameters, CIParameters ) {
+	ParametersVV( _ voices: Voices ) async throws -> VVParameters {
 		var
-		vv = VVParameters()
-		if isVV( voices ) {
-			var
-			request = try URLRequest( "\(voices.voicevoxURL)/audio_query?speaker=\( try VVStyleID( voices ) )&text=\( try URLEncoded( dialog ) )" )
-			request.httpMethod = "POST"
-			vv = try JSONDecoder().decode( VVParameters.self, from: try await SharedData( request ) )
-		}
-
+		request = try URLRequest( "\(voices.voicevoxURL)/audio_query?speaker=\( try VVStyleID( voices ) )&text=\( try URLEncoded( dialog ) )" )
+		request.httpMethod = "POST"
+		return try JSONDecoder().decode( VVParameters.self, from: try await SharedData( request ) )
+	}
+	
+	func
+	ParametersCI( _ voices: Voices ) async throws -> CIParameters {
+		var
+		request = try URLRequest( "\(voices.coeiroinkURL)/v1/estimate_prosody" )
+		request.httpMethod = "POST"
+		request.addValue( "application/json", forHTTPHeaderField: "Content-type" )
+		request.httpBody = try JSONEncoder().encode( [ "text": dialog ] )
+		let
+		prosody = try JSONDecoder().decode( CIProsody.self, from: try await SharedData( request ) )
 		var
 		ci = CIParameters()
-		if isCI( voices ) {
-			var
-			request = try URLRequest( "\(voices.coeiroinkURL)/v1/estimate_prosody" )
-			request.httpMethod = "POST"
-			request.addValue( "application/json", forHTTPHeaderField: "Content-type" )
-			request.httpBody = try JSONEncoder().encode( [ "text": dialog ] )
-			let
-			prosody = try JSONDecoder().decode( CIProsody.self, from: try await SharedData( request ) )
-			ci.prosodyDetail = prosody.detail
-		}
-		return ( vv, ci )
+		ci.prosodyDetail = prosody.detail
+		return ci
 	}
-
+	
 	func
 	WAV( _ voices: Voices ) async throws -> Data {
 		if isVV( voices ) {
 			var
-			parameters						= parametersVV
+			parameters = parametersVV != nil ? parametersVV! : try await ParametersVV( voices )
 			parameters.speedScale			= speedScale
 			parameters.pitchScale			= pitchScale
 			parameters.intonationScale		= intonationScale
@@ -191,7 +176,7 @@ ScriptLine: Codable, Hashable {
 		}
 		if isCI( voices ) {
 			var
-			parameters						= parametersCI
+			parameters = parametersCI != nil ? parametersCI! : try await ParametersCI( voices )
 			parameters.speedScale			= speedScale
 			parameters.pitchScale			= pitchScale
 			parameters.intonationScale		= intonationScale
@@ -206,11 +191,11 @@ ScriptLine: Codable, Hashable {
 			request.httpMethod = "POST"
 			request.setValue( "application/json", forHTTPHeaderField: "Content-Type" )
 			request.httpBody = try JSONEncoder().encode( parameters )
-print( String( data: try JSONEncoder().encode( parameters ) ) )
+//	print( String( data: try JSONEncoder().encode( parameters ) ) )
 			
 			return try await SharedData( request )
 		}
-		throw ZMMError( "No wav data for: \(speaker):\(style)" )
+		throw ZMMError( "No such voice: \(speaker):\(style)" )
 	}
 }
 
@@ -228,17 +213,13 @@ ZMMDocument: FileDocument {
 	
 	init( configuration: ReadConfiguration ) throws {
 		guard let data = configuration.file.regularFileContents else {
-			//	The file isn't in the correct format // The file might be corrupted, truncated, or in an unexpected format.
 			throw CocoaError( .fileReadCorruptFile )
 		}
-		//	Data is missing
-		//	Data isn't in the correct format
 		script = try JSONDecoder().decode( [ ScriptLine ].self, from: data )
 	}
 	
 	func
 	fileWrapper( configuration: WriteConfiguration ) throws -> FileWrapper {
-		//	try の検証が難しい
 		.init( regularFileWithContents: try JSONEncoder().encode( script ) )
 	}
 }

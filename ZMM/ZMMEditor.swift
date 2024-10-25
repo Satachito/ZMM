@@ -1,69 +1,7 @@
 import SwiftUI
 
-let
-SLIDER_BG = Color.black.opacity( 0.1 )
-let
-SLIDER_FG = Color.blue.opacity ( 0.9 )
-
 struct
-ZMMHorizontalSlider: View {
-	@Binding	var	value	: Double
-				let	range	: ClosedRange< Double >
-
-	var
-	body: some View {
-		GeometryReader { geometry in
-			let	width	= geometry.size.width
-			let	height	= geometry.size.height
-			let	upper	= range.upperBound
-			let	lower	= range.lowerBound
-			let	span	= upper - lower
-			ZStack( alignment: .leading ) {
-				Rectangle().fill( SLIDER_BG ).frame( width: width							, height: height )
-				Rectangle().fill( SLIDER_FG ).frame( width: width * ( value - lower ) / span, height: height )
-			}.frame( width: width ).gesture(
-				DragGesture().onChanged {
-					let
-					value = span * $0.location.x / width + lower
-					guard value >= lower else { return }
-					guard value <= upper else { return }
-					self.value = value
-				}
-			)
-		}
-	}
-}
-struct
-ZMMVerticalSlider: View {
-	@Binding	var	value	: Double
-				let	range	: ClosedRange< Double >
-
-	var
-	body: some View {
-		GeometryReader { geometry in
-			let	width	= geometry.size.width
-			let	height	= geometry.size.height
-			let	upper	= range.upperBound
-			let	lower	= range.lowerBound
-			let	span	= upper - lower
-			ZStack( alignment: .bottomLeading ) {
-				Rectangle().fill( SLIDER_BG ).frame( width: width, height: height )
-				Rectangle().fill( SLIDER_FG ).frame( width: width, height: height * ( value - lower ) / span )
-			}.frame( height: height ).gesture(
-				DragGesture().onChanged {
-					let
-					value = span * ( height - $0.location.y ) / height + lower
-					guard value >= lower else { return }
-					guard value <= upper else { return }
-					self.value = value
-				}
-			)
-		}
-	}
-}
-
-struct
-AccentPhraseEditorView: View {
+VVAccentPhraseEditorView: View {
 	@Binding	var	accent_phrase	: VVAccentPhrase
 
 	var
@@ -76,16 +14,22 @@ AccentPhraseEditorView: View {
 				Text( String( format: "%.2f", mora.vowel_length ) ).monospacedDigit()
 				ZMMHorizontalSlider( value: b_mora.vowel_length, range: 0.0...3.0 ).frame( width: 64, height: 12 )
 				
-				Text( String( format: "%.2f", mora.pitch ) ).monospacedDigit()
-				ZMMVerticalSlider( value: b_mora.pitch, range: 3.0...6.5 ).frame( width: 12, height: 64 )
-				
+				if mora.pitch > 0 {
+					Text( String( format: "%.2f", mora.pitch ) ).monospacedDigit()
+					ZMMVerticalSlider( value: b_mora.pitch, range: 3.0...6.5 ).frame( width: 12, height: 64 )
+				} else {
+					Button( "無声音" ) {
+						accent_phrase.moras[ index ].pitch = 5.5
+					}.buttonStyle( BorderlessButtonStyle() )
+					Rectangle().fill( SLIDER_BG ).frame( width: 12, height: 64 )
+				}
 				Spacer()
 				
 				SystemImageButton( index + 1 == accent_phrase.accent ? "circle.fill" : "circle" ) {
 					accent_phrase.accent = index + 1
 				}
 				
-				Text( accent_phrase.moras[ index ].text )
+				Text( mora.text )
 			}
 		}
 	}
@@ -126,11 +70,18 @@ EditorView: View {
 
 	@State	private			var	error		= ZMMError() as Error
 	@State	private			var	alert		= false
+	@State	private			var	errorVV		= ZMMError() as Error
+	@State	private			var	alertVV		= false
+	@State	private			var	errorCI		= ZMMError() as Error
+	@State	private			var	alertCI		= false
 
 	@Binding				var	line		: ScriptLine
 
 	@State	private			var	editingText	= ""
 	
+	@State	private			var	editingVV	= VVParameters()
+	@State	private			var	editingCI	= CIParameters()
+
 	var
 	body: some View {
 		VStack {
@@ -138,50 +89,68 @@ EditorView: View {
 				editingText = line.dialog
 			}
 			Divider()
-			Button( "Commit" ) {
+			Button( "保存とパラメータ編集(以前のパラメータの編集内容は破棄されます)" ) {
 				line.dialog = editingText
-				Task {
-					do {
-						( line.parametersVV, line.parametersCI ) = try await line.Parameters( voices )
-					} catch {
-						await MainActor.run { ( self.error, alert ) = ( error, true ) }
+				if line.isVV( voices ) {
+					Task {
+						do {
+							let
+							parameters = try await line.ParametersVV( voices )
+							await MainActor.run{ editingVV = parameters }
+						} catch {
+							await MainActor.run{ ( errorVV, alertVV ) = ( error, true ) }
+						}
+					}
+				}
+				if line.isCI( voices ) {
+					Task {
+						do {
+							let
+							parameters = try await line.ParametersCI( voices )
+							await MainActor.run{ editingCI = parameters }
+						} catch {
+							await MainActor.run{ ( errorCI, alertCI ) = ( error, true ) }
+						}
 					}
 				}
 			}
 			ScrollView( .horizontal ) {
 				HStack {
 					Divider()
-					if line.isVV( voices ) {
-						ForEach( line.parametersVV.accent_phrases.indices, id: \.self ) { index in
-							AccentPhraseEditorView( accent_phrase: $line.parametersVV.accent_phrases[ index ] ).frame( width: 64 )
-							if let pause_mora = line.parametersVV.accent_phrases[ index ].pause_mora {
-								VStack{
-									Text( String( format: "%.2f", pause_mora.vowel_length ) ).monospacedDigit()
-									ZMMHorizontalSlider( value: $line.parametersVV.accent_phrases[ index ].pause_length, range: 0.0...3.0 ).frame( width: 64, height: 12 ).onAppear {
-										line.parametersVV.accent_phrases[ index ].pause_length = pause_mora.vowel_length
-									}
-									Spacer()
-									SystemImageButton( "circle.slash" ) {}.opacity( 0.5 )
-									Text( pause_mora.text )
-								}.frame( width: 64 )
-							}
-							Divider()
+					ForEach( editingVV.accent_phrases.indices, id: \.self ) { index in
+						VVAccentPhraseEditorView( accent_phrase: $editingVV.accent_phrases[ index ] ).frame( width: 64 )
+						if let pause_mora = editingVV.accent_phrases[ index ].pause_mora {
+							VStack{
+								Text( String( format: "%.2f", pause_mora.vowel_length ) ).monospacedDigit()
+								ZMMHorizontalSlider( value: $editingVV.accent_phrases[ index ].pause_length, range: 0.0...3.0 ).frame( width: 64, height: 12 ).onAppear {
+									editingVV.accent_phrases[ index ].pause_length = pause_mora.vowel_length
+								}
+								Spacer()
+								SystemImageButton( "circle.slash" ) {}.opacity( 0.5 )
+								Text( pause_mora.text )
+							}.frame( width: 64 )
 						}
+						Divider()
 					}
-					if line.isCI( voices ) {
-						ForEach( line.parametersCI.prosodyDetail.indices, id: \.self ) { index in
-							CIMorasEditorView( moras: $line.parametersCI.prosodyDetail[ index ] ).frame( width: 64 )
-							Divider()
-						}
+					ForEach( editingCI.prosodyDetail.indices, id: \.self ) { index in
+						CIMorasEditorView( moras: $editingCI.prosodyDetail[ index ] ).frame( width: 64 )
+						Divider()
 					}
 				}.padding()
+			}.onAppear() {
+				if let parameters = line.parametersVV { editingVV = parameters }
+				if let parameters = line.parametersCI { editingCI = parameters }
 			}
+			Button( "Commit" ) {
+				if line.isVV( voices ) { line.parametersVV = editingVV }
+				if line.isCI( voices ) { line.parametersCI = editingCI }
+			}
+			
 			HStack {
 				AudioControllerView {
 					do {
 						return try await line.WAV( voices )
 					} catch {
-						//	TODO: MainActorにする必要あるか調査
 						( self.error, alert ) = ( error, true )
 						return Data()
 					}
@@ -191,6 +160,10 @@ EditorView: View {
 			}
 		}.alert( isPresented: $alert ) {
 			ZMMAlert( "再生に失敗しました", error )
+		}.alert( isPresented: $alertVV ) {
+			ZMMAlert( "VOICEVOX パラメータの取得に失敗しました", errorVV )
+		}.alert( isPresented: $alertCI ) {
+			ZMMAlert( "COIEROINK パラメータの取得に失敗しました", errorCI )
 		}
 	}
 }

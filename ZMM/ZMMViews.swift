@@ -35,17 +35,11 @@ LineView: View {
 					speaker	: $line.speaker
 				,	style	: $line.style
 				).onChange( of: line.speaker ) {
-					Task {
-						do {
-							( line.parametersVV, line.parametersCI ) = try await line.Parameters( voices )
-						} catch {
-							await MainActor.run { ( self.error, alert ) = ( error, true ) }
-						}
-					}
+					line.parametersVV = nil
+					line.parametersCI = nil
 				}
 				Divider()
 				Button( line.dialog ) { showingEditor = true }.buttonStyle( PlainButtonStyle() )
-			//	Text( line.dialog )
 				Spacer()
 				Divider()
 				AudioControllerView {
@@ -60,12 +54,12 @@ LineView: View {
 			if voiceOptions.hasTrue {
 				HStack {
 					Divider()
-					if voiceOptions.speedScale			{ DoubleParamView( value: $line.speedScale			, title: "話速"		, low: +0.50, high: 2.00 ) }
-					if voiceOptions.pitchScale			{ DoubleParamView( value: $line.pitchScale			, title: "音高"		, low: -0.15, high: 0.15 ) }
-					if voiceOptions.intonationScale		{ DoubleParamView( value: $line.intonationScale		, title: "抑揚"		, low: +0.00, high: 2.00 ) }
-					if voiceOptions.volumeScale			{ DoubleParamView( value: $line.volumeScale			, title: "音量"		, low: +0.00, high: 2.00 ) }
-					if voiceOptions.prePhonemeLength	{ DoubleParamView( value: $line.prePhonemeLength	, title: "開始無音"	, low: +0.00, high: 1.50 ) }
-					if voiceOptions.postPhonemeLength	{ DoubleParamView( value: $line.postPhonemeLength	, title: "修了無音"	, low: +0.00, high: 1.50 ) }
+					if voiceOptions.speedScale			{ DoubleParamView( value: $line.speedScale			, title: "話速"		, range: +0.50...2.00 ) }
+					if voiceOptions.pitchScale			{ DoubleParamView( value: $line.pitchScale			, title: "音高"		, range: -0.15...0.15 ) }
+					if voiceOptions.intonationScale		{ DoubleParamView( value: $line.intonationScale		, title: "抑揚"		, range: +0.00...2.00 ) }
+					if voiceOptions.volumeScale			{ DoubleParamView( value: $line.volumeScale			, title: "音量"		, range: +0.00...2.00 ) }
+					if voiceOptions.prePhonemeLength	{ DoubleParamView( value: $line.prePhonemeLength	, title: "開始無音"	, range: +0.00...1.50 ) }
+					if voiceOptions.postPhonemeLength	{ DoubleParamView( value: $line.postPhonemeLength	, title: "修了無音"	, range: +0.00...1.50 ) }
 				}
 			}
 		}.sheet( isPresented: $showingEditor ) {
@@ -133,11 +127,8 @@ ScriptView: View {
 	}
 
 	func
-	AddLine( _ speaker: String = "ずんだもん", _ style: String = "ノーマル", _ dialog: String = "" ) async throws {
-		var
-		line = try await ScriptLine( speaker, style, dialog, voices )
-		( line.parametersVV, line.parametersCI ) = try await line.Parameters( voices )
-		script.append( line )
+	AddLine( _ speaker: String = "ずんだもん", _ style: String = "ノーマル", _ dialog: String = "" ) {
+		script.append( ScriptLine( speaker: speaker, style: style, dialog: dialog ) )
 	}
 
 	var
@@ -197,15 +188,9 @@ ScriptView: View {
 			Divider()
 			HStack {
 				SystemImageButton( "plus" ) {
-					Task {
-						do {
-							script.count > 0
-							?	try await AddLine( script.last!.speaker, script.last!.style )
-							:	try await AddLine()
-						} catch {
-							await MainActor.run { ( self.error, alert ) = ( error, true ) }
-						}
-					}
+					script.count > 0
+					?	AddLine( script.last!.speaker, script.last!.style )
+					:	AddLine()
 				}.alert( isPresented: $alert ) {
 					ZMMAlert( "スクリプトの追加に失敗しました。", error )
 				}
@@ -222,7 +207,7 @@ ScriptView: View {
 					panel.canChooseDirectories = false
 
 					if panel.runModal() == .OK, let url = panel.url {
-						OpenTask( url )
+						Open( url )
 					}
 #endif
 				}.alert( isPresented: $alert ) {
@@ -232,7 +217,7 @@ ScriptView: View {
 				.sheet( isPresented: $showOpen ) {
 					DocumentPicker( exportMode: false, types: [ .content ] ) { urls in
 						if let url = urls.first {
-							OpenTask( url )
+							Open( url )
   						}
 					}
 				}
@@ -241,18 +226,16 @@ ScriptView: View {
 		}
 	}
 	func
-	OpenTask( _ url: URL ) {
-		Task {
-			do {
-				for line in try String( contentsOfFile: url.path, encoding: .utf8 ).components( separatedBy: "\n" ) {
-					let
-					components = line.components( separatedBy: delimiter )
-					//	TODO: GET DEFAULT STYLE
-					if components.count == 2 { try await AddLine( components[ 0 ], "ノーマル", components[ 1 ] ) }
-				}
-			} catch {
-				await MainActor.run { ( self.error, alert ) = ( error, true ) }
+	Open( _ url: URL ) {
+		do {
+			for line in try String( contentsOfFile: url.path, encoding: .utf8 ).components( separatedBy: "\n" ) {
+				let
+				components = line.components( separatedBy: delimiter )
+				//	TODO: GET DEFAULT STYLE
+				if components.count == 2 { AddLine( components[ 0 ], "ノーマル", components[ 1 ] ) }
 			}
+		} catch {
+			( self.error, alert ) = ( error, true )
 		}
 	}
 }
@@ -271,4 +254,3 @@ ContentView: View {
 #Preview {
 	ContentView( document: .constant( ZMMDocument() ) )
 }
-
