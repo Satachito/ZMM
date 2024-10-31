@@ -77,22 +77,12 @@ URLEncoded( _ string: String ) throws -> String {
 
 import	SwiftUI
 
-struct
-SystemImageButton: View {
-	let	name	: String
-	let	action	: () -> ()
-	
-	init(
-		_	name	: String
-	,		action	: @escaping () -> ()
-	) {
-		self.name	= name
-		self.action	= action
-	}
-	var
-	body: some View {
-		Button( action: action ) { Image( systemName: name ) }
-	}
+func
+SystemImageButton(
+	_	name	: String
+,	_	action	: @escaping () -> ()
+) -> some View {
+	Button( action: action ) { Image( systemName: name ) }.buttonStyle( .plain )
 }
 
 #if os( macOS )
