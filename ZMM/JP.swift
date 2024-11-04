@@ -187,25 +187,15 @@ import UniformTypeIdentifiers
 struct
 DocumentPicker: UIViewControllerRepresentable {
 
-	@State	private	var
-	exportMode		= false
+	let
+	forExport		: Bool
 	
-	@State	private	var
+	let
 	types			: [ UTType ]
 	
 	let
 	action			: ( [ URL ] ) -> ()
 
-	init(
-			exportMode	: Bool
-	,		types		: [ UTType ]
-	,	_	action		: @escaping ( [ URL ] ) -> ()
-	) {
-		self.exportMode	= exportMode
-		self.types		= types
-		self.action		= action
-	}
-	
 	class
 	Coordinator	: NSObject, UIDocumentPickerDelegate {
 		var
@@ -234,12 +224,12 @@ DocumentPicker: UIViewControllerRepresentable {
 	func
 	makeUIViewController( context: Context ) -> UIDocumentPickerViewController {
 		let
-		vc = exportMode
-		?	UIDocumentPickerViewController( forExporting			: []	, asCopy: true )
- 		:	UIDocumentPickerViewController( forOpeningContentTypes	: types	, asCopy: true )
-		vc.delegate					= context.coordinator
-		vc.allowsMultipleSelection	= false
-		return vc
+		VC = forExport
+		?	UIDocumentPickerViewController( forExporting			: []	)
+ 		:	UIDocumentPickerViewController( forOpeningContentTypes	: types	)
+		VC.delegate					= context.coordinator
+		VC.allowsMultipleSelection	= false
+		return VC
 	}
 
 	func

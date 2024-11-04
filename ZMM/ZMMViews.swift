@@ -215,7 +215,7 @@ ScriptView: View {
 				}
 #if os( iOS )
 				.sheet( isPresented: $showOpen ) {
-					DocumentPicker( exportMode: false, types: [ .content ] ) { urls in
+					DocumentPicker( forExport: false, types: [ .content ] ) { urls in
 						if let url = urls.first {
 							Open( url )
   						}
