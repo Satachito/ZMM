@@ -50,8 +50,8 @@ VoicePicker: View {
 									Button( style ) { Update( speaker, style ) }
 								}
 							}
-						} else {
-							Button( speaker ) { Update( speaker, styles[ 0 ] ) }
+						} else if let style = styles.first {
+							Button( speaker ) { Update( speaker, style ) }
 						}
 					}
 				}
@@ -66,8 +66,8 @@ VoicePicker: View {
 									Button( style ) { Update( speaker, style ) }
 								}
 							}
-						} else {
-							Button( speaker ) { Update( speaker, styles[ 0 ] ) }
+						} else if let style = styles.first {
+							Button( speaker ) { Update( speaker, style ) }
 						}
 					}
 				}

@@ -93,26 +93,46 @@ ZMMApp: App {
 	@State			private	var	alertVV			= false
 	@State			private	var	errorCI			= ZMMError() as Error
 	@State			private	var	alertCI			= false
+	@State			private	var	loadingVV		= false
+	@State			private	var	loadingCI		= false
 
 	func
-	VVTask() {
+	VVTask( showError: Bool = false ) {
+		guard !loadingVV else { return }
+		loadingVV = true
 		Task {
 			do {
 				let	speakers = try await voices.VVSpeakers()
-				await MainActor.run { voices.speakersVV = speakers }
+				await MainActor.run {
+					voices.speakersVV = speakers
+					loadingVV = false
+				}
 			} catch {
-				await MainActor.run { ( errorVV, alertVV ) = ( error, true ) }
+				await MainActor.run {
+					voices.speakersVV = []
+					loadingVV = false
+					if showError { ( errorVV, alertVV ) = ( error, true ) }
+				}
 			}
 		}
 	}
 	func
-	CITask() {
+	CITask( showError: Bool = false ) {
+		guard !loadingCI else { return }
+		loadingCI = true
 		Task {
 			do {
 				let	speakers = try await voices.CISpeakers()
-				await MainActor.run { voices.speakersCI = speakers }
+				await MainActor.run {
+					voices.speakersCI = speakers
+					loadingCI = false
+				}
 			} catch {
-				await MainActor.run { ( errorCI, alertCI ) = ( error, true ) }
+				await MainActor.run {
+					voices.speakersCI = []
+					loadingCI = false
+					if showError { ( errorCI, alertCI ) = ( error, true ) }
+				}
 			}
 		}
 	}
@@ -127,10 +147,10 @@ ZMMApp: App {
 			}
 			ContentView( document: $0.$document ).padding().environmentObject( voices ).toolbar {
 				if let speakers = voices.speakersVV, speakers.count == 0 {
-					ToolbarItem() { Button( "VOICEVOX に接続"		) { VVTask() } }
+					ToolbarItem() { Button( "VOICEVOX に接続"		) { VVTask( showError: true ) } }
 				}
 				if let speakers = voices.speakersCI, speakers.count == 0 {
-					ToolbarItem() { Button( "COEIROINK に接続"	) { CITask() } }
+					ToolbarItem() { Button( "COEIROINK に接続"	) { CITask( showError: true ) } }
 				}
 				ToolbarItem() {
 					SystemImageButton( "gear" ) { showSettings = true }

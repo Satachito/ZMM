@@ -39,8 +39,12 @@ LineView: View {
 					line.parametersCI = nil
 				}
 				Divider()
-				Button( line.dialog ) { showingEditor = true }.buttonStyle( PlainButtonStyle() )
-				Spacer()
+				Button { showingEditor = true } label: {
+					Text( line.dialog.isEmpty ? "テキストを入力…" : line.dialog )
+						.foregroundStyle( line.dialog.isEmpty ? .secondary : .primary )
+						.frame( maxWidth: .infinity, alignment: .leading )
+						.contentShape( Rectangle() )
+				}.buttonStyle( PlainButtonStyle() )
 				Divider()
 				AudioControllerView {
 					do {
@@ -68,7 +72,9 @@ LineView: View {
 #endif
 #if os( macOS )
 			if let window = NSApplication.shared.windows.first {
-				EditorView( line: $line ).frame( width: window.frame.size.width ).padding()
+				EditorView( line: $line )
+					.frame( minWidth: 640, idealWidth: window.frame.size.width, minHeight: 480 )
+					.padding()
 			}
 #endif
 		}.alert( isPresented: $alert ) {

@@ -85,7 +85,7 @@ EditorView: View {
 	var
 	body: some View {
 		VStack {
-			TextEditor( text: $editingText ).onAppear {
+			TextEditor( text: $editingText ).frame( minHeight: 120 ).onAppear {
 				editingText = line.dialog
 			}
 			Divider()
